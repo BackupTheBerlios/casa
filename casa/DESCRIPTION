@@ -1,6 +1,6 @@
 Package: casa
 Title: catch at age sampling analysis
-Version: 0.4-8
+Version: 0.5-0
 Author: Ernesto Jardim
 Description: Classes and methods for exploring fisheries length and age data.
 Depends: methods, R(>= 2.0.0)

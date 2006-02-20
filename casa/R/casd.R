@@ -31,10 +31,24 @@ casdVal <- function(object){
 	oal <- object@oal[object@oal$oal!=0,]
 	units <- object@units
 
-	Wk.strata <- paste(Wk$time, Wk$space, Wk$technical)
-	wkv.strata <- paste(wkv$time, wkv$space, wkv$technical)
-	nlkv.strata <- paste(nlkv$time, nlkv$space, nlkv$technical)
-	oal.strata <- paste(oal$time, oal$space, oal$technical)
+	# check names
+	if(sum(names(Wk) %in% c("time", "space", "technical", "Wk"))!=4){
+		stop("\nCASA: Wk with wrong names ! Rename variables to \"time\", \"space\", \"technical\", \"Wk\"", "\n", call=F)
+	}
+	if(sum(names(wkv) %in% c("time", "space", "technical", "sample", "wkv"))!=5){
+		stop("\nCASA: wkv with wrong names ! Rename variables to \"time\", \"space\", \"technical\", \"sample\", \"wkv\"", "\n")
+	}
+	if(sum(names(nlkv) %in% c("time", "space", "technical", "sample", "len", "nlkv"))!=6){
+		stop("\nCASA: nlkv with wrong names ! Rename variables to \"time\", \"space\", \"technical\", \"sample\", \"len\", \"nlkv\"", "\n")
+	}
+	if(sum(names(oal) %in% c("time", "space", "technical", "len", "age", "oal"))!=6){
+		stop("\nCASA: oal with wrong names ! Rename variables to \"time\", \"space\", \"technical\", \"len\", \"age\", \"oal\"", "\n")
+	}
+
+	Wk.strata <- paste(Wk$time, Wk$space, Wk$technical, sep="")
+	wkv.strata <- paste(wkv$time, wkv$space, wkv$technical, sep="")
+	nlkv.strata <- paste(nlkv$time, nlkv$space, nlkv$technical, sep="")
+	oal.strata <- paste(oal$time, oal$space, oal$technical, sep="")
 	
 	retval <- NULL
 	# check weight units
@@ -42,12 +56,12 @@ casdVal <- function(object){
 	{
 		if(units[1]!=units[2])
 		{
-			retval <- c(retval, "weights are in different units")
+			retval <- c(retval, "\nCASA: weights are in different units")
 		}
 		# check catch numbers units
 		if(units[3]!=units[4])
 		{
-			retval <- c(retval, "catch numbers are in different units")
+			retval <- c(retval, "\nCASA: catch numbers are in different units\n")
 		}
 	}
 	# samples weight and lengths match ?
@@ -55,19 +69,19 @@ casdVal <- function(object){
 	v2 <- sort(unique(paste(nlkv.strata, nlkv$sample))) 
 	if(!identical(v1, v2))
 	{
-		retval <- c(retval, "sample weights and sample lengths mismatch in strata and/or sample")
+		retval <- c(retval, "\nCASA: sample weights and sample lengths mismatch in strata and/or sample")
 	}
 	# total weight and samples weight match ?
 	v1 <- sort(unique(wkv.strata))
 	v2 <- sort(Wk.strata) 
 	if(length(v1 %in% v2)!=length(unique(wkv.strata)))
 	{
-		retval <- c(retval, "total weights and sample weights mismatch in strata")
+		retval <- c(retval, "\nCASA: total weights and sample weights mismatch in strata")
 	}
 	# ALK covers length distribution
 	if(length(unique(nlkv$len)) > length(unique(oal$len)))
 	{
-		retval <- c(retval, "some lengths don't exist in the ALK.")
+		retval <- c(retval, "\nCASA: some lengths don't exist in the ALK")
 	}
 
 	if(is.null(retval)) return(TRUE)
@@ -383,6 +397,7 @@ setMethod("Na.boot", "casd", function(obj, R, type=c("Nl","Pal","Na"), fcomb=F, 
 		}
 	}
 
+	
 	new("casa.boot",
 		obj.casa=obj.casa,
 		R=R,
@@ -400,13 +415,13 @@ setMethod("Na.boot", "casd", function(obj, R, type=c("Nl","Pal","Na"), fcomb=F, 
 setMethod("summary", "casd", function(object){
 
 	cat("object of class \"casd\" \n")
-	cat("description :", object@desc, "\n")
-	cat("total landings :", sum(object@Wk$Wk), object@units[1], "\n")
+	cat("description          :", object@desc, "\n")
+	cat("total landings       :", sum(object@Wk$Wk), object@units[1], "\n")
 	cat("total sampled weigth :", sum(object@wkv$wkv), object@units[2],"\n")
 	nstrata <- length(unique(paste(object@Wk$time, object@Wk$space, object@Wk$technical)))
-	cat("number of strata :", nstrata, "\n")
-	cat("lengths :\n", sort(unique(object@nlkv$len)), "\n")
-	cat("ages :\n", sort(unique(object@oal$age)), "\n")
+	cat("number of strata     :", nstrata, "\n")
+	cat("lengths              : [", min(object@nlkv$len), ",",max(object@nlkv$len),  "]\n", sep="")
+	cat("ages                 :", sort(unique(object@oal$age)), "\n")
 
 })
 
@@ -415,6 +430,12 @@ setMethod("summary", "casd", function(object){
 casd  <-  function(desc, Wk, wkv, nlkv, oal, units) {
 	
 	obj <- new("casd")
+
+	# transform so that factors have the same levels and no blanks
+	Wk <- tof(Wk)		
+	wkv <- tof(wkv)		
+	nlkv <- tof(nlkv)		
+	oal <- tof(oal)
 		
 	if (!missing(desc)) obj@desc <- desc
 	if (!missing(Wk)) obj@Wk <- Wk
@@ -428,3 +449,30 @@ casd  <-  function(desc, Wk, wkv, nlkv, oal, units) {
 	
 }
 
+setGeneric("tof", function(object, ...){
+	standardGeneric("tof")
+})
+
+setMethod("tof", signature("factor"), function(object){
+	object <- as.character(object)
+	object <- gsub("[ ]+", "", object)
+	object <- factor(object)
+	object
+})
+
+setMethod("tof", signature("character"), function(object){
+	object <- gsub("[ ]+", "", object)
+	object <- factor(object)
+	object
+})
+
+setMethod("tof", signature("data.frame"), function(object){
+	for(i in 1:ncol(object)){
+		if(is.factor(object[,i]) | is.character(object[,i])){
+			object[,i] <- tof(object[,i])
+		} else {
+			object[,i] <- object[,i]
+		}
+	}
+	object	
+})
