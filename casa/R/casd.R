@@ -246,11 +246,11 @@ setMethod("Pal", "casd", function(obj){
 	Palk <- lapply(split(oal,list(oal$strata, oal$len)), function(x) {
 		ol <- sum(x$oal)
 		x$Palk <- x$oal/ol
-		x$varPalk <- x$Palk*(1-x$Palk)/(ol-1)
+		# I'm not using the unbiased var to avoid NA when only 1 obs
+		x$varPalk <- x$Palk*(1-x$Palk)/(ol)
 		x		
 	})
 do.call("rbind", Palk)
-
 })
 
 # dd
@@ -316,7 +316,6 @@ setGeneric("Na.boot", function(obj, R, type, fcomb=F, alkbystrata=F...){
 })
 
 setMethod("Na.boot", "casd", function(obj, R, type=c("Nl","Pal","Na"), fcomb=F, alkbystrata=F){
-
 #	stop("SORRY, THIS IS STILL UNDER DEVELOPMENT !\n")	
 
 	obj.casa <- Na(obj, alkbystrata)
@@ -326,25 +325,29 @@ setMethod("Na.boot", "casd", function(obj, R, type=c("Nl","Pal","Na"), fcomb=F, 
 	Wk <- obj@Wk
 	wkv <- obj@wkv
 	
-	# concatenate into single level strata
+	# concatenate into single level strata and coerce to numeric (it's safer !)
 	Wk <- data.frame(strata=paste(Wk$time, Wk$space, Wk$technical), Wk=Wk$Wk)
+	Wk$strata <- as.numeric(Wk$strata)
 	wkv <- data.frame(strata=paste(wkv$time, wkv$space, wkv$technical), sample=wkv$sample, wkv=wkv$wkv)
+	wkv$strata <- as.numeric(wkv$strata)
+	wkv$sample <- as.numeric(wkv$sample)
 
 	# Nl
 	
 	if(type=="Nl" | type=="Na"){
 		nlkv <- obj@nlkv
 		nlkv <- data.frame(strata=paste(nlkv$time, nlkv$space, nlkv$technical), sample=nlkv$sample, len=nlkv$len, nlkv=nlkv$nlkv)
+		nlkv$strata <- as.numeric(nlkv$strata)
+		nlkv$sample <- as.numeric(nlkv$sample)
 		slen <- split(1:R,1:R)
 		for(i in 1:R){
 			bsvec <- lapply(split(nlkv, nlkv$strata), function(x){
 				svec <- unique(x$sample)
 				sample(svec, length(svec), replace=T)
 			})
-		
 			bsvec <- unlist(bsvec)
-			bnlkv <- obj@nlkv[obj@nlkv$sample %in% bsvec,]
-			bwkv <- obj@wkv[obj@wkv$sample %in% bsvec,]
+			bnlkv <- obj@nlkv[as.numeric(obj@nlkv$sample) %in% bsvec,]
+			bwkv <- obj@wkv[as.numeric(obj@wkv$sample) %in% bsvec,]
 			sobj <- obj
 			sobj@nlkv <- bnlkv
 			sobj@wkv <- bwkv
@@ -356,7 +359,6 @@ setMethod("Na.boot", "casd", function(obj, R, type=c("Nl","Pal","Na"), fcomb=F, 
 	if(type=="Pal" | type=="Na"){
 		oal <- obj@oal
 		oal <- data.frame(strata=paste(oal$time, oal$space, oal$technical), age=oal$age, len=oal$len, oal=oal$oal)
-
 		soal <- split(1:R,1:R)
 		for(i in 1:R){
 			bsk <- lapply(split(obj@oal, oal$strata), function(x){
@@ -449,19 +451,25 @@ casd  <-  function(desc, Wk, wkv, nlkv, oal, units) {
 	
 }
 
+# v2c - vector to char
+
 setGeneric("tof", function(object, ...){
 	standardGeneric("tof")
 })
 
 setMethod("tof", signature("factor"), function(object){
 	object <- as.character(object)
-	object <- gsub("[ ]+", "", object)
+	object <- gsub("[ ]+", " ", object)
+	object <- gsub("^[ ]+", "", object)
+	object <- gsub("[ ]+$", "", object)
 	object <- factor(object)
 	object
 })
 
 setMethod("tof", signature("character"), function(object){
-	object <- gsub("[ ]+", "", object)
+	object <- gsub("[ ]+", " ", object)
+	object <- gsub("^[ ]+", "", object)
+	object <- gsub("[ ]+$", "", object)
 	object <- factor(object)
 	object
 })
